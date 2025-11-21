@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OBJ网格简化工具</title>
+    <link href="https://cdn.staticfile.org/twitter-bootstrap/3.3.7/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .main-container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-top: 20px;
+        }
+        .upload-area {
+            border: 2px dashed #ccc;
+            border-radius: 8px;
+            padding: 40px;
+            text-align: center;
+            margin: 20px 0;
+            transition: all 0.3s;
+        }
+        .upload-area:hover {
+            border-color: #337ab7;
+            background-color: #f9f9f9;
+        }
+        .upload-area.dragover {
+            border-color: #5cb85c;
+            background-color: #e8f5e9;
+        }
+        .stats-panel {
+            background: #f9f9f9;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 15px 0;
+        }
+        .stat-item {
+            display: inline-block;
+            margin: 10px 20px;
+        }
+        .stat-label {
+            font-weight: bold;
+            color: #666;
+        }
+        .stat-value {
+            font-size: 1.2em;
+            color: #337ab7;
+        }
+        .slider-container {
+            margin: 20px 0;
+        }
+        .progress-container {
+            display: none;
+            margin: 20px 0;
+        }
+        #fileInput {
+            display: none;
+        }
+        .btn-group-custom {
+            margin: 20px 0;
+        }
+        .alert-custom {
+            margin-top: 15px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="text-center">
+            <img src="nuc.png" class="img-circle" width="100px" height="100px" onerror="this.style.display='none'">
+            <h1>OBJ网格简化工具</h1>
+            <p class="text-muted">上传OBJ文件并简化网格数据</p>
+        </div>
+
+        <div class="main-container">
+            <!-- 上传区域 -->
+            <div class="upload-area" id="uploadArea">
+                <i class="glyphicon glyphicon-cloud-upload" style="font-size: 48px; color: #ccc;"></i>
+                <h3>拖拽OBJ文件到这里</h3>
+                <p>或者</p>
+                <button class="btn btn-primary" onclick="document.getElementById('fileInput').click()">
+                    <i class="glyphicon glyphicon-folder-open"></i> 选择文件
+                </button>
+                <input type="file" id="fileInput" accept=".obj" />
+            </div>
+
+            <!-- 统计信息 -->
+            <div class="stats-panel" id="statsPanel" style="display: none;">
+                <h4>文件统计</h4>
+                <div class="stat-item">
+                    <span class="stat-label">顶点数:</span>
+                    <span class="stat-value" id="vertexCount">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">面数:</span>
+                    <span class="stat-value" id="faceCount">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">纹理坐标:</span>
+                    <span class="stat-value" id="texCoordCount">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">法线:</span>
+                    <span class="stat-value" id="normalCount">0</span>
+                </div>
+            </div>
+
+            <!-- 简化选项 -->
+            <div class="slider-container" id="simplifyOptions" style="display: none;">
+                <h4>简化选项</h4>
+                <div class="form-group">
+                    <label for="simplifyLevel">简化级别 (保留百分比): <span id="simplifyValue">50</span>%</label>
+                    <input type="range" class="form-control" id="simplifyLevel" min="10" max="100" value="50" step="5">
+                </div>
+                
+                <div class="checkbox">
+                    <label>
+                        <input type="checkbox" id="removeTexCoords"> 移除纹理坐标
+                    </label>
+                </div>
+                <div class="checkbox">
+                    <label>
+                        <input type="checkbox" id="removeNormals"> 移除法线
+                    </label>
+                </div>
+                <div class="checkbox">
+                    <label>
+                        <input type="checkbox" id="mergeVertices" checked> 合并重复顶点
+                    </label>
+                </div>
+            </div>
+
+            <!-- 进度条 -->
+            <div class="progress-container" id="progressContainer">
+                <div class="progress">
+                    <div class="progress-bar progress-bar-striped active" id="progressBar" role="progressbar" 
+                         aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" style="width: 0%">
+                        <span id="progressText">0%</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 操作按钮 -->
+            <div class="btn-group-custom text-center" id="actionButtons" style="display: none;">
+                <button class="btn btn-success btn-lg" id="simplifyBtn">
+                    <i class="glyphicon glyphicon-cog"></i> 简化网格
+                </button>
+                <button class="btn btn-primary btn-lg" id="downloadBtn" style="display: none;">
+                    <i class="glyphicon glyphicon-download-alt"></i> 下载简化后的OBJ
+                </button>
+                <button class="btn btn-default" id="resetBtn">
+                    <i class="glyphicon glyphicon-refresh"></i> 重置
+                </button>
+            </div>
+
+            <!-- 结果信息 -->
+            <div id="resultAlert" class="alert-custom"></div>
+        </div>
+
+        <div class="text-center" style="margin-top: 20px;">
+            <small class="text-muted">开发者：华北的一只猫@qq.com</small>
+        </div>
+    </div>
+
+    <script src="https://cdn.staticfile.org/jquery/2.1.1/jquery.min.js"></script>
+    <script src="https://cdn.staticfile.org/twitter-bootstrap/3.3.7/js/bootstrap.min.js"></script>
+    <script>
+        let objData = null;
+        let simplifiedData = null;
+        let fileName = '';
+
+        // OBJ解析器
+        class OBJParser {
+            constructor(content) {
+                this.content = content;
+                this.vertices = [];
+                this.texCoords = [];
+                this.normals = [];
+                this.faces = [];
+            }
+
+            parse() {
+                const lines = this.content.split('\n');
+                
+                for (let line of lines) {
+                    line = line.trim();
+                    if (!line || line.startsWith('#')) continue;
+
+                    const parts = line.split(/\s+/);
+                    const type = parts[0];
+
+                    switch(type) {
+                        case 'v':
+                            this.vertices.push([
+                                parseFloat(parts[1]),
+                                parseFloat(parts[2]),
+                                parseFloat(parts[3])
+                            ]);
+                            break;
+                        case 'vt':
+                            this.texCoords.push([
+                                parseFloat(parts[1]),
+                                parseFloat(parts[2])
+                            ]);
+                            break;
+                        case 'vn':
+                            this.normals.push([
+                                parseFloat(parts[1]),
+                                parseFloat(parts[2]),
+                                parseFloat(parts[3])
+                            ]);
+                            break;
+                        case 'f':
+                            const face = [];
+                            for (let i = 1; i < parts.length; i++) {
+                                const indices = parts[i].split('/');
+                                face.push({
+                                    v: parseInt(indices[0]) - 1,
+                                    vt: indices[1] ? parseInt(indices[1]) - 1 : null,
+                                    vn: indices[2] ? parseInt(indices[2]) - 1 : null
+                                });
+                            }
+                            this.faces.push(face);
+                            break;
+                    }
+                }
+
+                return {
+                    vertices: this.vertices,
+                    texCoords: this.texCoords,
+                    normals: this.normals,
+                    faces: this.faces
+                };
+            }
+        }
+
+        // OBJ简化器
+        class OBJSimplifier {
+            constructor(objData, options) {
+                this.objData = objData;
+                this.options = options;
+            }
+
+            simplify() {
+                let result = {
+                    vertices: [...this.objData.vertices],
+                    texCoords: this.options.removeTexCoords ? [] : [...this.objData.texCoords],
+                    normals: this.options.removeNormals ? [] : [...this.objData.normals],
+                    faces: [...this.objData.faces]
+                };
+
+                // 合并重复顶点
+                if (this.options.mergeVertices) {
+                    result = this.mergeVertices(result);
+                }
+
+                // 减少面数
+                if (this.options.simplifyLevel < 100) {
+                    result = this.reduceFaces(result, this.options.simplifyLevel / 100);
+                }
+
+                return result;
+            }
+
+            mergeVertices(data) {
+                const vertexMap = new Map();
+                const newVertices = [];
+                const vertexRemap = [];
+
+                data.vertices.forEach((vertex, index) => {
+                    const key = vertex.join(',');
+                    if (vertexMap.has(key)) {
+                        vertexRemap[index] = vertexMap.get(key);
+                    } else {
+                        const newIndex = newVertices.length;
+                        vertexMap.set(key, newIndex);
+                        vertexRemap[index] = newIndex;
+                        newVertices.push(vertex);
+                    }
+                });
+
+                // 更新面索引
+                const newFaces = data.faces.map(face => 
+                    face.map(vertex => ({
+                        ...vertex,
+                        v: vertexRemap[vertex.v]
+                    }))
+                );
+
+                return {
+                    ...data,
+                    vertices: newVertices,
+                    faces: newFaces
+                };
+            }
+
+            reduceFaces(data, keepRatio) {
+                const targetFaceCount = Math.floor(data.faces.length * keepRatio);
+                const step = Math.max(1, Math.floor(data.faces.length / targetFaceCount));
+                
+                const newFaces = [];
+                for (let i = 0; i < data.faces.length; i += step) {
+                    newFaces.push(data.faces[i]);
+                }
+
+                return {
+                    ...data,
+                    faces: newFaces
+                };
+            }
+        }
+
+        // 导出为OBJ格式
+        function exportToOBJ(data) {
+            let output = '# Simplified by OBJ Mesh Simplifier\n';
+            output += '# 华北的一只猫@qq.com\n\n';
+
+            // 顶点
+            data.vertices.forEach(v => {
+                output += `v ${v[0]} ${v[1]} ${v[2]}\n`;
+            });
+
+            // 纹理坐标
+            if (data.texCoords.length > 0) {
+                output += '\n';
+                data.texCoords.forEach(vt => {
+                    output += `vt ${vt[0]} ${vt[1]}\n`;
+                });
+            }
+
+            // 法线
+            if (data.normals.length > 0) {
+                output += '\n';
+                data.normals.forEach(vn => {
+                    output += `vn ${vn[0]} ${vn[1]} ${vn[2]}\n`;
+                });
+            }
+
+            // 面
+            output += '\n';
+            data.faces.forEach(face => {
+                output += 'f';
+                face.forEach(vertex => {
+                    let faceStr = ` ${vertex.v + 1}`;
+                    if (vertex.vt !== null || vertex.vn !== null) {
+                        faceStr += '/';
+                        if (vertex.vt !== null) {
+                            faceStr += vertex.vt + 1;
+                        }
+                        if (vertex.vn !== null) {
+                            faceStr += '/' + (vertex.vn + 1);
+                        }
+                    }
+                    output += faceStr;
+                });
+                output += '\n';
+            });
+
+            return output;
+        }
+
+        // 更新统计信息
+        function updateStats(data) {
+            $('#vertexCount').text(data.vertices.length);
+            $('#faceCount').text(data.faces.length);
+            $('#texCoordCount').text(data.texCoords.length);
+            $('#normalCount').text(data.normals.length);
+            $('#statsPanel').show();
+        }
+
+        // 显示结果
+        function showResult(message, type = 'success') {
+            $('#resultAlert').html(`<div class="alert alert-${type}">${message}</div>`);
+        }
+
+        // 更新进度条
+        function updateProgress(percent, text) {
+            $('#progressBar').css('width', percent + '%').attr('aria-valuenow', percent);
+            $('#progressText').text(text || percent + '%');
+        }
+
+        // 文件上传处理
+        $('#fileInput').on('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                loadFile(file);
+            }
+        });
+
+        // 拖拽上传
+        const uploadArea = document.getElementById('uploadArea');
+        
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            const file = e.dataTransfer.files[0];
+            if (file && file.name.endsWith('.obj')) {
+                loadFile(file);
+            } else {
+                showResult('请上传.obj文件', 'danger');
+            }
+        });
+
+        // 加载文件
+        function loadFile(file) {
+            fileName = file.name;
+            $('#progressContainer').show();
+            updateProgress(0, '读取文件...');
+
+            const reader = new FileReader();
+            reader.onprogress = (e) => {
+                if (e.lengthComputable) {
+                    const percent = Math.round((e.loaded / e.total) * 50);
+                    updateProgress(percent, '读取中...');
+                }
+            };
+
+            reader.onload = (e) => {
+                updateProgress(50, '解析中...');
+                
+                setTimeout(() => {
+                    try {
+                        const parser = new OBJParser(e.target.result);
+                        objData = parser.parse();
+                        
+                        updateProgress(100, '完成!');
+                        setTimeout(() => {
+                            $('#progressContainer').hide();
+                        }, 1000);
+
+                        updateStats(objData);
+                        $('#simplifyOptions').show();
+                        $('#actionButtons').show();
+                        showResult(`文件 "${fileName}" 加载成功！`, 'success');
+                    } catch (error) {
+                        showResult('解析OBJ文件时出错: ' + error.message, 'danger');
+                        $('#progressContainer').hide();
+                    }
+                }, 100);
+            };
+
+            reader.onerror = () => {
+                showResult('读取文件失败', 'danger');
+                $('#progressContainer').hide();
+            };
+
+            reader.readAsText(file);
+        }
+
+        // 简化级别滑块
+        $('#simplifyLevel').on('input', function() {
+            $('#simplifyValue').text($(this).val());
+        });
+
+        // 简化按钮
+        $('#simplifyBtn').on('click', function() {
+            if (!objData) return;
+
+            $('#progressContainer').show();
+            updateProgress(0, '准备简化...');
+
+            setTimeout(() => {
+                try {
+                    const options = {
+                        simplifyLevel: parseInt($('#simplifyLevel').val()),
+                        removeTexCoords: $('#removeTexCoords').is(':checked'),
+                        removeNormals: $('#removeNormals').is(':checked'),
+                        mergeVertices: $('#mergeVertices').is(':checked')
+                    };
+
+                    updateProgress(30, '简化中...');
+
+                    const simplifier = new OBJSimplifier(objData, options);
+                    simplifiedData = simplifier.simplify();
+
+                    updateProgress(100, '完成!');
+
+                    const reduction = Math.round((1 - simplifiedData.faces.length / objData.faces.length) * 100);
+                    
+                    showResult(
+                        `简化完成！面数从 ${objData.faces.length} 减少到 ${simplifiedData.faces.length} (减少 ${reduction}%)`,
+                        'success'
+                    );
+
+                    updateStats(simplifiedData);
+                    $('#downloadBtn').show();
+
+                    setTimeout(() => {
+                        $('#progressContainer').hide();
+                    }, 1000);
+
+                } catch (error) {
+                    showResult('简化过程出错: ' + error.message, 'danger');
+                    $('#progressContainer').hide();
+                }
+            }, 100);
+        });
+
+        // 下载按钮
+        $('#downloadBtn').on('click', function() {
+            if (!simplifiedData) return;
+
+            const objContent = exportToOBJ(simplifiedData);
+            const blob = new Blob([objContent], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = fileName.replace('.obj', '_simplified.obj');
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            showResult('文件下载成功！', 'success');
+        });
+
+        // 重置按钮
+        $('#resetBtn').on('click', function() {
+            objData = null;
+            simplifiedData = null;
+            fileName = '';
+            $('#fileInput').val('');
+            $('#statsPanel').hide();
+            $('#simplifyOptions').hide();
+            $('#actionButtons').hide();
+            $('#downloadBtn').hide();
+            $('#progressContainer').hide();
+            $('#resultAlert').empty();
+            $('#simplifyLevel').val(50);
+            $('#simplifyValue').text('50');
+            $('#removeTexCoords').prop('checked', false);
+            $('#removeNormals').prop('checked', false);
+            $('#mergeVertices').prop('checked', true);
+        });
+    </script>
+</body>
+</html>
